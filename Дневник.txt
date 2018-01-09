@@ -22,7 +22,38 @@
   - Добавить настройки:
     - Контрагент для акта-реализации #акт-реализация 
       "Добавил в РС НастройкиTP ресурс "АктРеализация_Контрагент", вывел в форму настроек"
+    - Тип цен для акта-реализации #акт-реализация 
+      "Добавил в РС НастройкиTP ресурс "АктРеализация_ТипЦен", вывел в форму настроек"
 - Загрузка актов-списаний #акт-списание
   - создается несколько ед.изм #ошибка
     "Исправлено"
-  - 
+- Загрузка накладных-перемещений  #накладная-перемещение
+  - Есть два вида накладных: накладные перемещения со складов и накладные перемещения на склады. Но они почему-то содержат одни и те-же документы.
+  - Слепил такой запрос:
+    "SELECT mdoc_ID, mdoc_usr_ID
+    INTO #MoveDocuments
+    FROM MoveDocuments
+    JOIN MoveDocumentItems ON mdoc_ID = mdit_mdoc_ID
+    JOIN StoreEngine ON sten_Item_ID = mdit_ID
+    JOIN %IncludeStores S_In ON mdoc_stor_ID_In = S_In.stor_ID
+    JOIN %IncludeStores S_Out ON mdoc_stor_ID_Out = S_Out.stor_ID
+    WHERE mdoc_Date >= %DateBegin AND mdoc_Date < %DateEnd
+    	AND mdoc_mdst_ID = 1 
+      AND mdit_mdit_ID_Parent IS NULL AND (mdit_IsDeleted = 0 OR (mdit_serc_ID_In <> 0 AND mdit_serc_ID_Out <> 0))
+    GROUP BY mdoc_ID, mdoc_stor_ID_In, mdoc_stor_ID_Out, mdoc_usr_ID
+    
+    
+    
+    -- Заголовок
+    SELECT  D.mdoc_ID, D.mdoc_Name 'ДокументИмя', D.mdoc_Date 'Дата', D.mdoc_stor_ID_Out 'Отправитель', D.mdoc_stor_ID_In 'Получатель', stgr_part_ID 'Организация'
+    	, 'накладная перемещение Тиллипад "'+D.mdoc_Name+'"' 'Комментарий'
+    FROM MoveDocuments D
+    JOIN #MoveDocuments M ON D.mdoc_ID = M.mdoc_ID
+    JOIN Stores S_In ON D.mdoc_stor_ID_In = S_In.stor_ID
+    JOIN Stores S_Out ON D.mdoc_stor_ID_Out = S_Out.stor_ID
+    JOIN StoreGroups ON S_In.stor_stgr_ID = stgr_ID
+    ORDER BY mdoc_Date"
+  - Еще можно вручную сопоставлять склады, номенклатуру и прочее
+  - При подключении в торговле дополнительных таблиц возникла странная ошибка: ИД таблицы при замене типа на строку не предлагал указать длину строки и после подключения запросы не работали. Это наблюдалось на компьютере SUN, где стоит рабочая торговля. При подключении на компьютере CAFEBUHG все нормально подключилось, после чего обновил конфигурацию на рабочей торговле. С чем это связано пока не знаю.
+- Загрузка поступлений #поступление-товара
+  - При загрузке поступлений не подгрузилась часть номенклатуры. Оказывается это из-за того, что в настроечной базе хранилась связка с битой ссылкой. Почистил такие связки (объект не найден) и все загрузилось.
